@@ -42,10 +42,10 @@ const cleanRegions = simpleRegions.features.map((f) => {
   } else return f;
 });
 
-fs.writeFileSync(
-  "./ukraine-labels.json",
-  JSON.stringify(labelsGeoJson, null, 2),
-);
+// fs.writeFileSync(
+//   "./ukraine-labels.json",
+//   JSON.stringify(labelsGeoJson, null, 2),
+// );
 fs.writeFileSync(
   `./simple-ukraine.json`,
   JSON.stringify(simpleRegions, null, 2),
@@ -63,5 +63,8 @@ await geoJsonToGltf(
     ...labelsGeoJson.features.filter((f) => f.geometry.type === "Point"),
   ]),
   "./out/ukraine-regions.glb",
-  { mobileLabels, desktopLabels },
+  {
+    mobileLabels: mobileLabels.features,
+    desktopLabels: desktopLabels.features,
+  },
 );

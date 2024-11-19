@@ -127,18 +127,26 @@ export const geoJsonToGltf = async (
   );
 
   for (const feature of polygons) {
-    const desktopCenter = desktopLabels[feature.properties.id];
-    const mobileCenter = mobileLabels[feature.properties.id];
+    const desktopCenter = desktopLabels.find(
+      (labelFeature) => labelFeature.properties.id === feature.properties.id,
+    );
+    const mobileCenter = mobileLabels.find(
+      (labelFeature) => labelFeature.properties.id === feature.properties.id,
+    );
     const coords = turf.coordAll(feature).map(projection).map(convertCoords);
 
     const name = feature.properties.id || "water";
     const { node, box3 } = coordsToNode(coords, document, buffer, name);
 
-    if (desktopCenter && mobileCenter) {
+    if (desktopCenter || mobileCenter) {
       node.setExtras({
         name,
-        desktopLabelPos: desktopCenter,
-        mobileLabelPos: mobileCenter,
+        desktopLabelPos: convertCoords(
+          projection(desktopCenter.geometry.coordinates),
+        ),
+        mobileLabelPos: convertCoords(
+          projection(mobileCenter.geometry.coordinates),
+        ),
         labelPos: desktopCenter,
       });
     }
