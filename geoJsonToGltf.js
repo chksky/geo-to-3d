@@ -1,8 +1,8 @@
-import * as d3 from 'd3';
-import * as THREE from 'three';
-import * as turf from '@turf/turf';
-import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
-import { Document, NodeIO } from '@gltf-transform/core';
+import * as d3 from "d3";
+import * as THREE from "three";
+import * as turf from "@turf/turf";
+import * as BufferGeometryUtils from "three/addons/utils/BufferGeometryUtils.js";
+import { Document, NodeIO } from "@gltf-transform/core";
 
 const bevel = 0.2;
 const depth = 4;
@@ -11,13 +11,16 @@ const extrudeSettings = {
   steps: 1,
   depth,
   bevelEnabled: true,
-  bevelThickness: bevel,
+  bevelThickness: bevel / 10,
   bevelSize: bevel,
   bevelOffset: -bevel,
-  bevelSegments: 2
+  bevelSegments: 1,
 };
 
-const colorScale = d3.scaleLinear().domain([10, 20]).range(['#fee32f', '#fc4427']);
+const colorScale = d3
+  .scaleLinear()
+  .domain([10, 20])
+  .range(["#fee32f", "#fc4427"]);
 
 const coordsToNode = (coords, gltfDocument, gltfBuffer, nodeName) => {
   const d = depth;
@@ -31,7 +34,10 @@ const coordsToNode = (coords, gltfDocument, gltfBuffer, nodeName) => {
   }
   shape.lineTo(...coords[0]);
 
-  const geometry = new THREE.ExtrudeGeometry(shape, { ...extrudeSettings, depth: d });
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    ...extrudeSettings,
+    depth: d,
+  });
   const indexedGeo = BufferGeometryUtils.mergeVertices(geometry);
 
   const indexesArray = indexedGeo.getIndex().array;
@@ -41,12 +47,12 @@ const coordsToNode = (coords, gltfDocument, gltfBuffer, nodeName) => {
   const indices = gltfDocument
     .createAccessor()
     .setArray(indexesArray)
-    .setType('SCALAR')
+    .setType("SCALAR")
     .setBuffer(gltfBuffer);
   const position = gltfDocument
     .createAccessor()
     .setArray(positionArray)
-    .setType('VEC3')
+    .setType("VEC3")
     .setBuffer(gltfBuffer);
   const material = gltfDocument
     .createMaterial()
@@ -57,21 +63,24 @@ const coordsToNode = (coords, gltfDocument, gltfBuffer, nodeName) => {
   const texcoord = gltfDocument
     .createAccessor()
     .setArray(uvArray)
-    .setType('VEC2')
+    .setType("VEC2")
     .setBuffer(gltfBuffer);
 
   const prim = gltfDocument
     .createPrimitive()
     .setMaterial(material)
     .setIndices(indices)
-    .setAttribute('POSITION', position)
-    .setAttribute('TEXCOORD_0', texcoord);
+    .setAttribute("POSITION", position)
+    .setAttribute("TEXCOORD_0", texcoord);
 
-  const mesh = gltfDocument.createMesh('District').addPrimitive(prim);
+  const mesh = gltfDocument.createMesh("District").addPrimitive(prim);
 
   return {
-    node: gltfDocument.createNode(nodeName).setMesh(mesh).setTranslation([0, 0, 0]),
-    box3: new THREE.Box3().setFromBufferAttribute(geometry.attributes.position)
+    node: gltfDocument
+      .createNode(nodeName)
+      .setMesh(mesh)
+      .setTranslation([0, 0, 0]),
+    box3: new THREE.Box3().setFromBufferAttribute(geometry.attributes.position),
   };
 };
 
@@ -83,7 +92,11 @@ const getK = (ex, ey) => {
   else return { kx: dx / dy, ky: 1 };
 };
 
-export const geoJsonToGltf = async (geoJson, filePath) => {
+export const geoJsonToGltf = async (
+  geoJson,
+  filePath,
+  { mobileLabels, desktopLabels },
+) => {
   const projection = d3.geoMercator();
   const allCoords = turf.coordAll(geoJson).map(projection);
   const extentX = d3.extent(allCoords.map((c) => c[0])),
@@ -103,26 +116,31 @@ export const geoJsonToGltf = async (geoJson, filePath) => {
   const document = new Document();
   const buffer = document.createBuffer();
 
-  const scene = document.createScene('Scene');
-  const districtsGroup = document.createNode('CityDistricts');
+  const scene = document.createScene("Scene");
+  const districtsGroup = document.createNode("CityDistricts");
   scene.addChild(districtsGroup);
 
   const box = new THREE.Box3();
 
-  const labelPositions = geoJson.features.filter((f) => f.geometry.type === 'Point');
   const polygons = geoJson.features.filter(
-    (f) => f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon'
+    (f) => f.geometry.type === "Polygon" || f.geometry.type === "MultiPolygon",
   );
 
   for (const feature of polygons) {
-    const center = labelPositions.find((f) => f.properties.id == feature.properties.id);
+    const desktopCenter = desktopLabels[feature.properties.id];
+    const mobileCenter = mobileLabels[feature.properties.id];
     const coords = turf.coordAll(feature).map(projection).map(convertCoords);
 
-    const name = feature.properties.id || 'water';
+    const name = feature.properties.id || "water";
     const { node, box3 } = coordsToNode(coords, document, buffer, name);
 
-    if (center) {
-      node.setExtras({ name, labelPos: convertCoords(projection(center.geometry.coordinates)) });
+    if (desktopCenter && mobileCenter) {
+      node.setExtras({
+        name,
+        desktopLabelPos: desktopCenter,
+        mobileLabelPos: mobileCenter,
+        labelPos: desktopCenter,
+      });
     }
     districtsGroup.addChild(node);
 
